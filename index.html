@@ -68,6 +68,15 @@
         color: #c62828;
         font-size: 13px;
       }
+
+      #logout {
+        margin-top: 10px;
+        background: #666666;
+      }
+
+      #logout:hover {
+        background: #444444;
+      }
     </style>
   </head>
 
@@ -85,6 +94,9 @@
       </button>
 
       <div id="message" role="status" aria-live="polite"></div>
+      <button id="logout" type="button" hidden>
+        Log out
+      </button>
     </main>
 
     <script type="module" src="./login.js"></script>

@@ -3,7 +3,9 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.0.0/firebas
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js'
 
 const firebaseConfig = {
@@ -27,6 +29,34 @@ googleProvider.setCustomParameters({
 
 const googleLoginButton = document.querySelector('#google-login')
 const messageElement = document.querySelector('#message')
+const logoutButton = document.querySelector('#logout')
+
+logoutButton.addEventListener('click', async () => {
+  logoutButton.disabled = true
+
+  try {
+    await signOut(auth)
+    showMessage('You have been logged out.', false)
+    googleLoginButton.hidden = false
+    logoutButton.hidden = true
+  } catch (error) {
+    console.error('Hosted logout failed:', error)
+    showMessage('Unable to log out. Please try again.')
+  } finally {
+    logoutButton.disabled = false
+  }
+})
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    googleLoginButton.hidden = true
+    logoutButton.hidden = false
+    showMessage(`Signed in as ${user.email}`, false)
+  } else {
+    googleLoginButton.hidden = false
+    logoutButton.hidden = true
+  }
+})
 
 function showMessage(message, isError = true) {
   messageElement.textContent = message
@@ -45,11 +75,19 @@ function getLoginRequest() {
 
   const callbackUrl = new URL(redirectUri)
 
-  if (
-    callbackUrl.protocol !== 'binaire:' ||
-    callbackUrl.hostname !== 'auth' ||
-    callbackUrl.pathname !== '/'
-  ) {
+  // Allow the production deep-link (binaire://auth/) OR a local HTTP server
+  // callback that is used by the Electron app in development mode.
+  const isDeepLink =
+    callbackUrl.protocol === 'binaire:' &&
+    callbackUrl.hostname === 'auth' &&
+    callbackUrl.pathname === '/'
+
+  const isLocalhost =
+    callbackUrl.protocol === 'http:' &&
+    (callbackUrl.hostname === '127.0.0.1' || callbackUrl.hostname === 'localhost') &&
+    callbackUrl.pathname === '/callback'
+
+  if (!isDeepLink && !isLocalhost) {
     throw new Error('Invalid Voyager callback URL.')
   }
 
