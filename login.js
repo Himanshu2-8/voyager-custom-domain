@@ -1,5 +1,4 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js'
-
+import { initializeAuth, inMemoryPersistence } from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js'
 import {
   getAuth,
   GoogleAuthProvider,
@@ -19,8 +18,9 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
-
+const auth = initializeAuth(app, {
+  persistence: inMemoryPersistence
+})
 const googleProvider = new GoogleAuthProvider()
 
 googleProvider.setCustomParameters({
