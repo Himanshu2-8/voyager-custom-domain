@@ -117,25 +117,35 @@ async function startGoogleLogin() {
       throw new Error('Google did not return a provider credential.')
     }
 
-    const callbackUrl = new URL(redirectUri)
-
-    callbackUrl.searchParams.set('state', state)
-
-    if (providerCredential.idToken) {
-      callbackUrl.searchParams.set('idToken', providerCredential.idToken)
-    }
-
-    if (providerCredential.accessToken) {
-      callbackUrl.searchParams.set('accessToken', providerCredential.accessToken)
-    }
-
     if (!providerCredential.idToken && !providerCredential.accessToken) {
       throw new Error('Google returned no usable credential.')
     }
 
     showMessage('Login successful. Returning to Voyager...', false)
 
-    window.location.assign(callbackUrl.toString())
+    // Submit credentials in the POST body instead of putting them in the URL.
+    // A native form submission avoids CORS/preflight issues with localhost.
+    const callbackForm = document.createElement('form')
+    callbackForm.method = 'POST'
+    callbackForm.action = redirectUri
+    callbackForm.style.display = 'none'
+
+    const fields = {
+      state,
+      idToken: providerCredential.idToken || '',
+      accessToken: providerCredential.accessToken || ''
+    }
+
+    for (const [name, value] of Object.entries(fields)) {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value
+      callbackForm.appendChild(input)
+    }
+
+    document.body.appendChild(callbackForm)
+    callbackForm.submit()
   } catch (error) {
     console.error('Hosted Google login failed:', error)
 
