@@ -9,13 +9,13 @@ import {
 } from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js'
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyDy8X7VIYHay4HLd8uYR7DT2FOh7TtTf8Q",
+  authDomain: "freznelai.firebaseapp.com",
+  projectId: "freznelai",
+  storageBucket: "freznelai.firebasestorage.app",
+  messagingSenderId: "738000387736",
+  appId: "1:738000387736:web:334b92e83e7eb9efdf1aed",
+  measurementId: "G-GVGH84C0V6"
 }
 
 const app = initializeApp(firebaseConfig)
@@ -77,12 +77,12 @@ function getLoginRequest() {
 
   const callbackUrl = new URL(redirectUri)
 
-  // Allow the production deep-link (binaire://auth/) OR a local HTTP server
-  // callback that is used by the Electron app in development mode.
+  // Allow the Voyager production deep-link OR a local HTTP callback used as
+  // a development fallback.
   const isDeepLink =
-    callbackUrl.protocol === 'binaire:' &&
+    callbackUrl.protocol === 'navic:' &&
     callbackUrl.hostname === 'auth' &&
-    callbackUrl.pathname === '/'
+    callbackUrl.pathname === '/callback'
 
   const isLocalhost =
     callbackUrl.protocol === 'http:' &&
@@ -99,7 +99,8 @@ function getLoginRequest() {
 
   return {
     redirectUri: callbackUrl.toString(),
-    state
+    state,
+    isDeepLink
   }
 }
 
@@ -108,7 +109,7 @@ async function startGoogleLogin() {
   showMessage('Opening Google sign-in...', false)
 
   try {
-    const { redirectUri, state } = getLoginRequest()
+    const { redirectUri, state, isDeepLink } = getLoginRequest()
 
     const result = await signInWithPopup(auth, googleProvider)
     const providerCredential = GoogleAuthProvider.credentialFromResult(result)
@@ -123,18 +124,29 @@ async function startGoogleLogin() {
 
     showMessage('Login successful. Returning to Voyager...', false)
 
+    const fields = {
+      state,
+      idToken: providerCredential.idToken || '',
+      accessToken: providerCredential.accessToken || ''
+    }
+
+    if (isDeepLink) {
+      const callbackUrl = new URL(redirectUri)
+
+      for (const [name, value] of Object.entries(fields)) {
+        callbackUrl.searchParams.set(name, value)
+      }
+
+      window.location.assign(callbackUrl.toString())
+      return
+    }
+
     // Submit credentials in the POST body instead of putting them in the URL.
     // A native form submission avoids CORS/preflight issues with localhost.
     const callbackForm = document.createElement('form')
     callbackForm.method = 'POST'
     callbackForm.action = redirectUri
     callbackForm.style.display = 'none'
-
-    const fields = {
-      state,
-      idToken: providerCredential.idToken || '',
-      accessToken: providerCredential.accessToken || ''
-    }
 
     for (const [name, value] of Object.entries(fields)) {
       const input = document.createElement('input')
