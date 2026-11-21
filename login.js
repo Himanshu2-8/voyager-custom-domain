@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  GithubAuthProvider,
 } from 'https://www.gstatic.com/firebasejs/13.0.0/firebase-auth.js'
 
 const firebaseConfig = {
@@ -24,12 +25,14 @@ const auth = initializeAuth(app, {
   popupRedirectResolver: browserPopupRedirectResolver
 })
 const googleProvider = new GoogleAuthProvider()
+const githubProvider = new GithubAuthProvider();
 
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 })
 
 const googleLoginButton = document.querySelector('#google-login')
+const githubLoginButton = document.querySelector('#github-login');
 const messageElement = document.querySelector('#message')
 const logoutButton = document.querySelector('#logout')
 
@@ -40,6 +43,7 @@ logoutButton.addEventListener('click', async () => {
     await signOut(auth)
     showMessage('You have been logged out.', false)
     googleLoginButton.hidden = false
+    githubLoginButton.hidden = false
     logoutButton.hidden = true
   } catch (error) {
     console.error('Hosted logout failed:', error)
@@ -52,10 +56,12 @@ logoutButton.addEventListener('click', async () => {
 onAuthStateChanged(auth, (user) => {
   if (user) {
     googleLoginButton.hidden = true
+    githubLoginButton.hidden = true
     logoutButton.hidden = false
-    showMessage(`Signed in as ${user.email}`, false)
+    showMessage(`Signed in as ${user.email || user.displayName || 'User'}`, false)
   } else {
     googleLoginButton.hidden = false
+    githubLoginButton.hidden = false
     logoutButton.hidden = true
   }
 })
@@ -125,6 +131,7 @@ async function startGoogleLogin() {
     showMessage('Login successful. Returning to Voyager...', false)
 
     const fields = {
+      provider: 'google',
       state,
       idToken: providerCredential.idToken || '',
       accessToken: providerCredential.accessToken || ''
@@ -175,6 +182,84 @@ async function startGoogleLogin() {
   }
 }
 
+async function startGithubLogin() {
+  githubLoginButton.disabled = true
+  showMessage('Opening GitHub sign-in...', false)
+
+  try {
+    const { redirectUri, state, isDeepLink } = getLoginRequest()
+
+    const result = await signInWithPopup(auth, githubProvider)
+    const providerCredential = GithubAuthProvider.credentialFromResult(result)
+
+    if (!providerCredential) {
+      throw new Error('GitHub did not return a provider credential.')
+    }
+
+    if (!providerCredential.idToken && !providerCredential.accessToken) {
+      throw new Error('GitHub returned no usable credential.')
+    }
+
+    showMessage('Login successful. Returning to Voyager...', false)
+
+    const fields = {
+      provider: 'github',
+      state,
+      idToken: providerCredential.idToken || '',
+      accessToken: providerCredential.accessToken || ''
+    }
+
+    if (isDeepLink) {
+      const callbackUrl = new URL(redirectUri)
+
+      for (const [name, value] of Object.entries(fields)) {
+        callbackUrl.searchParams.set(name, value)
+      }
+
+      window.location.assign(callbackUrl.toString())
+      return
+    }
+
+    // Submit credentials in the POST body instead of putting them in the URL.
+    // A native form submission avoids CORS/preflight issues with localhost.
+    const callbackForm = document.createElement('form')
+    callbackForm.method = 'POST'
+    callbackForm.action = redirectUri
+    callbackForm.style.display = 'none'
+
+    for (const [name, value] of Object.entries(fields)) {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value
+      callbackForm.appendChild(input)
+    }
+
+    document.body.appendChild(callbackForm)
+    callbackForm.submit()
+  } catch (error) {
+    console.error('Hosted GitHub login failed:', error)
+
+    if (error.code === 'auth/popup-closed-by-user') {
+      showMessage('The GitHub sign-in window was closed.')
+    } else if (error.code === 'auth/popup-blocked') {
+      showMessage('The browser blocked the GitHub sign-in popup.')
+    } else if (error.code === 'auth/unauthorized-domain') {
+      showMessage('This login page domain is not authorized in Firebase.')
+    } else if (error.code === 'auth/account-exists-with-different-credential') {
+      showMessage('An account already exists with this email using a different sign-in method.')
+    } else {
+      showMessage(error.message || 'Unable to sign in with GitHub.')
+    }
+
+    githubLoginButton.disabled = false
+  }
+}
+
 googleLoginButton.addEventListener('click', () => {
   void startGoogleLogin()
+})
+
+githubLoginButton.addEventListener('click', () => {
+  void startGithubLogin()
 })
